@@ -1,0 +1,3195 @@
+---
+title: "Vivametrica_ABJHI Outputs"
+date: {r Sys.time()}
+output:
+  word_document: default
+  html_document: 
+    df_print: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=FALSE, warning=FALSE, message=FALSE, include = TRUE)
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+#Demographic and Table 1 information
+
+## Load Data and Libraries
+The following are preparatory steps to get the script to the point where we can actually analyse everything. The actual code has been hidden, because it is not strictly necessary. 
+```{r load_data, echo=FALSE}
+speedmode = "OFF"
+
+#load libraries
+library(psych)
+library(wakefield)
+library(MatchIt)
+library(pacman)
+library(knitr)
+library (tinytex)
+library (gmodels)
+library (MASS)
+library(ggplot2)
+
+# change working directory
+workdir = "E:/ABJHI Vivametrica Secure/_Analysis"
+#workdir = "D:/ABJHI Vivametrica Secure" #for work computer
+setwd(workdir)
+
+#find the most recent vivametrica download
+files2analyse = paste(workdir, "/CSVs_to_analyse/", sep = "") 
+#access folder with static-named reports from all sources
+f2a.list = list.files (files2analyse) #Gather list of all files
+
+filename = paste(files2analyse, "matching_cntrl_cohort.csv", sep = "")
+df.abjhi.matches = data.frame(read.csv2(file = filename, sep = ","))
+
+filename = paste(files2analyse, "matching_viva_cohort.csv", sep = "")
+df.abjhi.vpts = data.frame(read.csv2(file = filename, sep = ","))
+#View(df.abjhi.vpts)
+```
+
+
+
+*This is a failsafe: if speedmode is ON, the analyses presented below are incorrect*
+Speedmode is: `r speedmode`
+
+
+****************
+#Whole Cohort
+## Whole Cohort: Continuous variables
+These results are hidden for clarity, but can be made visible for further analyses
+```{r Whole_Cohort_Continuous, echo=FALSE, results = "hide"}
+df.abjhi.vpts$admitAge = as.double(as.character(df.abjhi.vpts$admitAge))
+abjhi.vpts.desc.age = describe(df.abjhi.vpts$admitAge)
+# rownames(abjhi.vpts.desc.age) = "Age"
+
+df.abjhi.vpts$bmi = as.double(as.character(df.abjhi.vpts$bmi))
+abjhi.vpts.desc.bmi = describe(df.abjhi.vpts$bmi)
+# rownames(abjhi.vpts.desc.bmi) = "BMI"
+
+df.abjhi.vpts$heightCM = as.double(as.character(df.abjhi.vpts$heightCM))
+abjhi.vpts.desc.ht = describe(df.abjhi.vpts$heightCM)
+# rownames(abjhi.vpts.desc.ht) = "HeightCM"
+
+df.abjhi.vpts$weightKG = as.double(as.character(df.abjhi.vpts$weightKG))
+abjhi.vpts.desc.wt = describe(df.abjhi.vpts$weightKG)
+# rownames(abjhi.vpts.desc.wt) = "WeightKG"
+
+descriptives = data.frame()
+descriptives = rbind(abjhi.vpts.desc.age, abjhi.vpts.desc.bmi)
+descriptives = rbind(descriptives, abjhi.vpts.desc.ht)
+descriptives = rbind(descriptives, abjhi.vpts.desc.wt)
+knit.desc = descriptives
+
+knitr::kable(knit.desc, format = "markdown")
+```
+
+## Whole Cohort: Categorical Variables
+These results are hidden for clarity, but can be made visible for further analyses
+Gender Ratios:
+```{r Gender, echo = FALSE, results = "hide"}
+#Gender Ratio
+knitr::kable(table(df.abjhi.vpts$sex), format = "markdown")
+```
+
+Surgeons performing the operations:
+```{r Surgeons, echo = FALSE, results = "hide"}
+#Surgeons by Name
+knitr::kable(table(df.abjhi.vpts$SurgeonName), format = "markdown")
+```
+
+
+Sites from which the patients were recruited:
+```{r Sites, echo = FALSE, results = "hide"}
+#Patients Per Site
+knitr::kable(table(df.abjhi.vpts$siteName), format = "markdown")
+```
+
+Which knee was operated upon:
+```{r KneeSide, echo = FALSE, results = "hide"}
+#Which Knee was operate upon
+knitr::kable(table(df.abjhi.vpts$procLocationShortDesc), format = "markdown")
+```
+
+How many arthroplasties (including hip) that the patients have accrued 
+```{r NumArthroPl, echo = FALSE, results = "hide"}
+#Number of Arthorplasties patient has experienced
+knitr::kable(table(df.abjhi.vpts$ProcedureSequenceNo), format = "markdown")
+
+
+```
+
+
+****************
+#Withdrawn Patients Comparisons
+## DescribeBy withdrawal status: Continuous Variables
+
+```{r SplitBy_Withdrawal_Continuous}
+ttestsoutput = function(ttestout, testing){
+  tval = round(as.numeric(unlist(ttestout)[[1]]), 3)
+  parmdf = round(as.numeric(unlist(ttestout)[[2]]), 0)
+  pval = round(as.numeric(unlist(ttestout)[[3]]), 4)
+  if(pval< 0.001){pval.text = "p<0.001"} else {pval.text = round(as.numeric(unlist(ttestout)[[3]]), 4)}
+  t.test.text = paste("Test: ", testing," -- ", "t", "(", parmdf, ")=", tval, ", ", pval.text, sep ="")
+  print (t.test.text)
+}
+
+
+# Age DescribedBy Withdrawal Status
+abjhi.vpts.desc.by = describeBy(x = df.abjhi.vpts$admitAge, group = df.abjhi.vpts$Withdrawn)
+abjhi.vpts.desc.by = rbind(abjhi.vpts.desc.by$N, abjhi.vpts.desc.by$Y)
+rownames(abjhi.vpts.desc.by) = c("Age: Included", "Age: Withdrawn")
+desc.by = data.frame(abjhi.vpts.desc.by)
+desc.by = cbind(Header=rownames(desc.by), desc.by)
+rownames(desc.by) <- NULL
+(desc.by.age = desc.by)
+knitr::kable(abjhi.vpts.desc.by)
+(ttestout = t.test(x = df.abjhi.vpts$admitAge, group = df.abjhi.vpts$Withdrawn))
+ttestsoutput(ttestout = ttestout, testing = "Age")
+
+
+# BMI DescribedBy Withdrawal Status
+abjhi.vpts.desc.by = describeBy(x = df.abjhi.vpts$bmi, group = df.abjhi.vpts$Withdrawn)
+abjhi.vpts.desc.by = rbind(abjhi.vpts.desc.by$N, abjhi.vpts.desc.by$Y)
+rownames(abjhi.vpts.desc.by) = c("BMI: Included", "BMI: Withdrawn")
+desc.by = data.frame(abjhi.vpts.desc.by)
+desc.by = cbind(Header=rownames(desc.by), desc.by)
+rownames(desc.by) <- NULL
+(desc.by.bmi = desc.by)
+knitr::kable(abjhi.vpts.desc.by)
+desc.by.quant = rbind(desc.by.age, desc.by.bmi)
+(ttestout = t.test(x = df.abjhi.vpts$bmi, group = df.abjhi.vpts$Withdrawn))
+ttestsoutput(ttestout = ttestout, testing = "BMI")
+
+# Height DescribedBy Withdrawal Status
+abjhi.vpts.desc.by = describeBy(x = df.abjhi.vpts$heightCM, group = df.abjhi.vpts$Withdrawn)
+abjhi.vpts.desc.by = rbind(abjhi.vpts.desc.by$N, abjhi.vpts.desc.by$Y)
+rownames(abjhi.vpts.desc.by) = c("Height: Included", "Height: Withdrawn")
+desc.by = data.frame(abjhi.vpts.desc.by)
+desc.by = cbind(Header=rownames(desc.by), desc.by)
+rownames(desc.by) <- NULL
+(desc.by.ht = desc.by)
+knitr::kable(abjhi.vpts.desc.by)
+desc.by.quant = rbind(desc.by.quant, desc.by.ht)
+t.test(x = df.abjhi.vpts$admitAge, group = df.abjhi.vpts$Withdrawn)
+(ttestout = t.test(x = df.abjhi.vpts$admitAge, group = df.abjhi.vpts$Withdrawn))
+ttestsoutput(ttestout = ttestout, testing = "Height")
+
+
+# Weight DescribedBy Withdrawal Status
+abjhi.vpts.desc.by = describeBy(x = df.abjhi.vpts$weightKG, group = df.abjhi.vpts$Withdrawn)
+abjhi.vpts.desc.by = rbind(abjhi.vpts.desc.by$N, abjhi.vpts.desc.by$Y)
+rownames(abjhi.vpts.desc.by) = c("Weight: Included", "Weight: Withdrawn")
+desc.by = data.frame(abjhi.vpts.desc.by)
+desc.by = cbind(Header=rownames(desc.by), desc.by)
+rownames(desc.by) <- NULL
+(desc.by.wt = desc.by)
+knitr::kable(abjhi.vpts.desc.by)
+desc.by.quant = rbind(desc.by.quant, desc.by.wt)
+(ttestout = t.test(x = df.abjhi.vpts$admitAge, group = df.abjhi.vpts$Withdrawn))
+ttestsoutput(ttestout = ttestout, testing = "Weight")
+
+```
+
+
+## TableBy Withdrawal Status: Categorical Variables
+```{r SplitBy_Withdrawal_Categorical}
+chisq.output = function(tab.out, testing, sim.p.value = TRUE) {
+  chisq.out = chisq.test(tab.out, simulate.p.value = sim.p.value)
+  chi = round(as.numeric(unlist(chisq.out)[[1]]), 3)
+  parm.df = round(as.numeric(unlist(chisq.out)[[2]]), 0)
+  pval = round(as.numeric(unlist(chisq.out)[[3]]), 4)
+  if(pval< 0.001){pval.text = "p<0.001"} else {pval.text = paste("p=", pval)}
+  if (sim.p.value == TRUE){
+    chi.test.text = paste("Test: ", testing, " -- ", "Chi^2", "=", chi, ", ", pval.text, sep ="")
+    } 
+  else {
+    chi.test.text = paste("Test: ", testing, " -- ", "Chi^2", "(", parmdf, ")=", chi, ", ", pval.text, sep ="")
+    }
+  print(chisq.out)
+  print (chi.test.text)
+}
+
+#Gender Ratio
+tab.out = xtabs(~ df.abjhi.vpts$sex + df.abjhi.vpts$Withdrawn)
+knitr::kable(tab.out, format = "markdown")
+# (chisq.out = chisq.test(tab.out, simulate.p.value = TRUE))
+chisq.output(tab.out = tab.out, testing = "Gender")
+
+#Surgeons by Name
+tab.out = xtabs(~ df.abjhi.vpts$SurgeonName + df.abjhi.vpts$Withdrawn)
+knitr::kable(tab.out, format = "markdown")
+# chisq.test(tab.out, simulate.p.value = TRUE)
+chisq.output(tab.out = tab.out, testing = "Surgeon Name")
+
+#Patients Per Site
+tab.out = xtabs(~ df.abjhi.vpts$siteName + df.abjhi.vpts$Withdrawn)
+knitr::kable(tab.out, format = "markdown")
+# chisq.test(tab.out, simulate.p.value = TRUE)
+chisq.output(tab.out = tab.out, testing = "Site Name")
+
+#Which Knee was operate upon
+tab.out = xtabs(~ df.abjhi.vpts$procLocationShortDesc + df.abjhi.vpts$Withdrawn)
+knitr::kable(tab.out, format = "markdown")
+# chisq.test(tab.out, simulate.p.value = TRUE)
+chisq.output(tab.out = tab.out, testing = "Knee")
+
+#Number of Arthorplasties patient has experienced
+tab.out = xtabs(~ df.abjhi.vpts$ProcedureSequenceNo + df.abjhi.vpts$Withdrawn)
+knitr::kable(tab.out, format = "markdown")
+# chisq.test(tab.out, simulate.p.value = TRUE)
+chisq.output(tab.out = tab.out, testing = "Number of Previous srugeries")
+
+```
+
+## A nicer table to present the demographic data
+```{r}
+require(tableone)
+
+KreateTableOne = function(x, ..., printSMD = TRUE){
+  t1 = tableone::CreateTableOne(data=x, ...)
+  t2 = print(t1, quote=TRUE, ...)
+  rownames(t2) = gsub(pattern='\\"', replacement='', rownames(t2))
+  colnames(t2) = gsub(pattern='\\"', replacement='', colnames(t2))
+  return(t2)
+}
+
+
+# @rdname KreateTableOne
+svyKreateTableOne = function(x, ..., printSMD = TRUE){
+  t1 = tableone::svyCreateTableOne(data=x, ...)
+  t2 = print(t1, quote=TRUE, ...)
+  rownames(t2) = gsub(pattern='\\"', replacement='', rownames(t2))
+  colnames(t2) = gsub(pattern='\\"', replacement='', colnames(t2))
+  return(t2)
+}
+
+
+ktab = KreateTableOne(vars = c('bmi', 'admitAge', 'weighKG', 'heightCM', 'sex', 'distance', 'weights', 'ProcedureSequenceNo', 'SurgeonName', 'siteName'), 
+               strata = 'Withdrawn', x = df.abjhi.vpts
+               )
+
+knitr::kable(ktab, format = "markdown")
+```
+
+
+
+## Remove withdrawn patients
+All information presented from here out will be only for those patients who did not withdraw from the study.
+
+``` {r remove_withdrawn, include = FALSE}
+df.abjhi.vpts.nowithdrawn = df.abjhi.vpts[df.abjhi.vpts$Withdrawn == "Y", ]
+withdrawals = subset(df.abjhi.vpts, Withdrawn != "N")
+
+
+```
+Patients withdrawn from furture analysis: `r withdrawals$patientId`
+
+
+
+
+#Preparing Vivametrica data for processing
+##Loading Vivametrica Data
+
+``` {r Load_Viva_Data, echo = FALSE}
+#the goals set
+filename = paste(files2analyse, "V_AICEGrantGoalValue.csv", sep = "")
+df.vgoals = data.frame(read.csv2(file = filename, sep = ","))
+
+#Steps, distance, etc; raw data
+filename = paste(files2analyse, "V_AICEGrantHealthData.csv", sep = "")
+df.vhealth = data.frame(read.csv2(file = filename, sep = ","))
+
+#Timestamped logins
+filename = paste(files2analyse, "V_AICEGrantLoginTimestamps.csv", sep = "")
+df.vlogins = data.frame(read.csv2(file = filename, sep = ","))
+
+#Answers to the HRA questions, except weight, height, BMI
+filename = paste(files2analyse, "V_AICEGrantUserHRAQuestionAndAnswers.csv", sep = "")
+df.vhra = data.frame(read.csv2(file = filename, sep = ","))
+
+#V scores at each time period
+filename = paste(files2analyse, "V_AICEGrantvScores.csv", sep = "")
+df.vscores = data.frame(read.csv2(file = filename, sep = ","))
+names(df.vscores)[1] = "Username"
+
+```
+## Vivametrica Health Data
+
+### VScores  (not controlling for steps registering)
+The data wherein steps and whether or not the device was tracking steps/syncing were included in the following descriptive analyses. 
+*The have been hidden to help clarity, but can be returned*
+
+```{r format_V_Scores_No_steps, results = "hide"}
+#Remove withdrawn patients
+df.vscores2 = df.vscores[ -which(as.character(df.vscores$Username) %in% as.character(withdrawals$patientId)), ]
+
+#sort by date and time
+df.vscores3 = df.vscores2[order(as.Date(df.vscores2$Start.Date)),]
+
+
+#Provide week numbers 
+weeklabs = c("PreSx02", "PreSx01", "PostSx01", "PostSx02","PostSx03", "PostSx04", "PostSx05", "PostSx06", "PostSx07", "PostSx08", "PostSx09", "PostSx10", "PostSx11", "PostSx12" )
+df.vscores2$WeekNum = NA
+df.vscores2$WeekNum = weeklabs
+#df.vscores2$WeekNum = df.vscores2$WeekNum-3
+
+#move those week numbers to column 2 for readability
+df.vscores3 = df.vscores2[c("Username","WeekNum",names(df.vscores2)[-19])]
+df.vscores3 = df.vscores3[,-3]
+
+```
+
+```{r V_Score_Total, results = "hide", fig.show="hide"}
+require(ggplot2)
+#df.vscores3$WeekNum = df.vscores3$WeekNum - 3
+
+
+#Total V score
+figtitl = "Total V Score"
+p = ggplot(data = df.vscores3, 
+           aes (x = as.factor(WeekNum), y = as.numeric(as.character(vScore.Overall)))
+           ) 
+## Labelling the Axes, Title, Tags
+p = p + xlab("Weeks")
+p = p + ylab (figtitl)
+p = p + labs(title = figtitl, tag = "A")
+p = p + scale_x_discrete(limits=weeklabs)
+p = p + theme(axis.text.x = element_text(angle = 90))
+  
+## Setting Axes Limits
+p = p + ylim(0, 100)
+
+## Print it
+q = plot(p + geom_boxplot())
+
+## Describe it
+desc.vtot = describeBy(as.numeric(as.character(df.vscores3$vScore.Overall)), group = df.vscores3$WeekNum)
+
+knit.desc = rbind(desc.vtot$PreSx02, desc.vtot$PreSx01)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx01)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx02)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx03)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx04)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx05)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx06)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx07)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx08)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx09)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx10)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx11)
+knit.desc = rbind(knit.desc, desc.vtot$PostSx12)
+rownames(knit.desc) = weeklabs
+
+knitr::kable(knit.desc, format = "markdown")
+```
+
+
+``` {r vScoreFigLoop, results = "hide", fig.show="hide"}
+
+require(ggplot2)
+#df.vscores3$WeekNum = df.vscores3$WeekNum - 3
+
+
+
+
+knit.desc = NULL
+loop = (6:19)
+for (i in loop){ 
+  knit.desc = NULL
+  figtitl = names(df.vscores3)[i]
+  
+  df.temp = data.frame(df.vscores3$Username, df.vscores3$WeekNum, as.numeric(as.character(df.vscores3[,i])))
+  names (df.temp) = c("Username", "WeekNum", "ii")
+  
+  p = ggplot(data = df.temp, 
+             aes (x = as.factor(WeekNum), y = ii)
+             ) 
+  ## Labelling the Axes, Title, Tags
+  p = p + xlab("Weeks")
+  p = p + ylab (figtitl)
+  p = p + labs(title = figtitl, tag = (i-5))
+  p = p + scale_x_discrete(limits=weeklabs)
+  p = p + theme(axis.text.x = element_text(angle = 90))
+  
+  ## Setting Axes Limits
+  p = p + ylim(0, 100)
+  
+  
+  ## Print it
+  q = plot(p + geom_boxplot())
+  
+  
+  ## Describe it
+  desc.vtot = describeBy(x=df.temp$ii, group = as.factor(df.vscores3$WeekNum))
+  knit.desc = desc.vtot
+  
+  knit.desc = rbind(desc.vtot$PreSx02, desc.vtot$PreSx01)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx01)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx02)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx03)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx04)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx05)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx06)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx07)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx08)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx09)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx10)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx11)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx12)
+  rownames(knit.desc) = weeklabs
+  
+  print(knitr::kable(knit.desc, format = "markdown"))
+    
+  }
+
+
+```
+
+
+
+
+# V scores controlling for weeks without steps registering
+
+```{r Crit_to_Include}
+needed.to.include = 3
+daycrit.needed = 100
+```
+The following analyses have removed V scores from weeks wherein participants did not meet a threshold of number of steps per day for a minimum number of days per week. 
+A participant needs at minimum: `r daycrit.needed` on `r needed.to.include` days within a given vScore calculation period.
+
+```{r Load_Surgical_Dates, }
+
+#Start and end dates for each time period for all participants
+filename = paste(files2analyse, "V_AICEGrantUsersToPull.csv", sep = "")
+df.vtimeframes = data.frame(read.csv2(file = filename, sep = ","))
+names(df.vtimeframes)[1] = "Username"
+
+#names(df.vtimeframes)
+
+##Checking the dates for surgery line up
+#Just going to do this by eye
+require (tidyr)
+
+keycol <- "timepoint"
+valuecol <- "timepointdate"
+gathercols <- c("Tneg2_Start","Tneg1_start","Tpos1_start","Tpos2_start","Tpos3_start","Tpos4_start","Tpos5_start","Tpos6_start","Tpos7_start","Tpos8_start","Tpos9_start","Tpos10_start","Tpos11_start","Tpos12_start")
+
+#str(df.vtimeframes)
+#names(df.vtimeframes)
+df.vtimeframeslong = gather_(df.vtimeframes, keycol, valuecol, gathercols)
+df.vtimeframeslong = df.vtimeframeslong[order(df.vtimeframeslong$Username, df.vtimeframeslong$timepointdate),]
+df.vtimeframeslong.trim = df.vtimeframeslong[-3:-16]
+df.vtimeframeslong.trim$timepointdate = as.Date(as.character(df.vtimeframeslong.trim$timepointdate))
+#df.vtimeframeslong.trim$timepointdateend = as.Date(df.vtimeframeslong.trim$timepointdate) + 7
+
+#Remove withdrawn patients
+#d<-d[!(d$A=="B" & d$E==0),]
+for(w in c(as.character(withdrawals$patientId))){
+  df.vtimeframeslong.trim = df.vtimeframeslong.trim[!(df.vtimeframeslong.trim$Username == w),]
+}
+
+#str(df.vtimeframeslong.trim)
+#str(df.vtimeframeslong)
+
+#utils::View(df.vtimeframeslong.trim)
+#utils::View(df.vscores)
+names(df.vtimeframeslong.trim)[4] = "Start.Date"
+df.vscores$Start.Date = as.Date(df.vscores$Start.Date)
+df.vtimeframeslong.trim$Start.Date = as.Date(df.vtimeframeslong.trim$Start.Date)
+
+
+timestest = merge(x = df.vtimeframeslong.trim, y = df.vscores, by = c("Username", "Start.Date"))
+
+
+#utils::View(df.vhealth)
+#unique(df.vhealth$Name)
+#df.vtimeframeslong = gather_(df.vtimeframes, keycol, valuecol, gathercols)
+#utils::View(df.vtimeframeslong)
+
+
+#View(timestest)
+
+
+```
+
+``` {r Format_Viva_Health_Data}
+
+#df.vhealth
+##Remove study admin accounts
+df.vhealth = df.vhealth[!(df.vhealth$Username == "tadam.sgr@gmail.com"),]
+df.vhealth = df.vhealth[!(df.vhealth$Username == "AICE_Admin"),]
+
+##Remove withdrawn patients
+#d<-d[!(d$A=="B" & d$E==0),]
+for(w in c(as.character(withdrawals$patientId))){
+  df.vhealth = df.vhealth[!(df.vhealth$Username == w),]
+}
+
+##Extract Step data
+steps = df.vhealth[(df.vhealth$Name == "Steps"),]
+#utils::View(df.vhealth)
+
+# Extract activity data
+activelight = df.vhealth[(df.vhealth$Name == "Minutes Lightly Active"),]
+activefair = df.vhealth[(df.vhealth$Name == "Minutes Fairly Active"),]
+activemod2vig = df.vhealth[(df.vhealth$Name == "Moderate to Vigorous Activity"),]
+
+
+activity = merge(x = steps, by.x = c("userId","Username","startDateTime"), 
+                   y = activelight, by.y = c("userId","Username","startDateTime"),
+                 all = TRUE
+                   )
+activity$Name.x = NULL
+activity$endDateTime.x = NULL
+activity$endDateTime.y = NULL
+activity$Name.y = NULL
+
+names(activity)[names(activity) == "value.x"] = "Steps"
+names(activity)[names(activity) == "value.y"] = "ActiveMinLight"
+
+activity = merge(x = activity, by.x = c("userId","Username","startDateTime"), 
+                   y = activefair, by.y = c("userId","Username","startDateTime"),
+                 all = TRUE
+                   )
+activity$Name = NULL
+activity$endDateTime = NULL
+names(activity)[names(activity) == "value"] = "Activeminfair"
+
+activity = merge(x = activity, by.x = c("userId","Username","startDateTime"), 
+                   y = activemod2vig, by.y = c("userId","Username","startDateTime"),
+                 all = TRUE
+                   )
+activity$Name = NULL
+activity$endDateTime = NULL
+names(activity)[names(activity) == "value"] = "ActiveminMod2Vig"
+
+activity$Steps = as.numeric(as.character(activity$Steps))
+activity$ActiveMinLight = as.numeric(as.character(activity$ActiveMinLight))
+activity$Activeminfair = as.numeric(as.character(activity$Activeminfair))
+activity$ActiveminMod2Vig = as.numeric(as.character(activity$ActiveminMod2Vig))
+
+for (i in c(1:nrow(activity))) {
+  activity$ActiveminSum[i] = sum(activity$ActiveMinLight[i], activity$Activeminfair[i], activity$ActiveminMod2Vig[i], na.rm=TRUE)
+
+}
+# utils::View(activity)
+
+
+```
+
+``` {r Find_valid_step_weeks}
+# the below was only needed to process the data; this data was then saved locally.
+#utils::View(timestest)
+#utils::View(activity)
+
+# timestest$include = NA
+# 
+# if (speedmode == "ON") {
+#   timestest$include = TRUE
+#   timestest$weeksteps = runif(nrow(timestest), 100, 20000)
+#   timestest$meanweeksteps[i] = mean(weeksteps)
+#   timestest$meanweekActiveMinLight[i] = mean(weekActiveMinLight)
+#   timestest$meanweekActiveminfair[i] = mean(weekActiveminfair)
+#   timestest$meanweekActiveminMod2Vig[i] = mean(weekActiveminMod2Vig)
+#   timestest$meanweekActiveminSum[i] = mean(weekActiveminSum)
+# 
+#   timestest$sumweeksteps[i] = sum(weeksteps, na.rm=TRUE)
+#   timestest$sumweekActiveMinLight[i] = sum(weekActiveMinLight, na.rm=TRUE)
+#   timestest$sumweekActiveminfair[i] = sum(weekActiveminfair, na.rm=TRUE)
+#   timestest$sumweekActiveminMod2Vig[i] = sum(weekActiveminMod2Vig, na.rm=TRUE)
+#   timestest$sumweekActiveminSum[i] = sum(weekActiveminSum, na.rm=TRUE)
+# } else {
+#   for (i in c(1:nrow(timestest))) {
+#     #i = 22
+#     ##For each row of timetest, find dates with that patient
+#     vdates = seq.Date(from = as.Date(timestest$Start.Date[i]), to = as.Date((timestest$Start.Date[i])+6), by="day")
+#     pt = as.character(timestest$Username[i])
+#     daycrit.met.ratio = NULL
+#     rm(list = c("weeksteps", "weekActiveMinLight", "weekActiveminfair", "weekActiveminMod2Vig", "weekActiveminSum"))
+#     week.met.list = list()
+#     weeksteps = list()
+#     weekActiveMinLight = list()
+#     weekActiveminfair = list()
+#     weekActiveminMod2Vig = list()
+#     weekActiveminSum = list()
+#     ii = 0
+#       for (day in as.list(vdates)) {
+#         #day = vdates[1]
+#         ii = ii + 1
+#         ##Find row where date and patient intersect
+#         steprow = which(as.Date(activity$startDateTime) == as.Date(day) & activity$Username == pt)
+# 
+#         ##Determine number of steps that day
+#         daysteps = as.numeric(as.character(activity$Steps[steprow]))
+# 
+#         ##Is this above the criteria set for a minimum number of steps for that day?
+#         daycrit.met = daysteps > daycrit.needed
+# 
+# 
+#         #compile minutes active for the day
+#         dayActiveMinLight = as.numeric(as.character(activity$ActiveMinLight[steprow]))
+#         dayActiveminfair= as.numeric(as.character(activity$Activeminfair[steprow]))
+#         dayActiveminMod2Vig = as.numeric(as.character(activity$ActiveminMod2Vig[steprow]))
+#         dayActiveminSum = as.numeric(as.character(activity$ActiveminSum[steprow]))
+# 
+# 
+#         ##Compile all of the T/F answers for a week into one ratio
+#         #Append the day's minutes active and steps into a vector for the week for each measure of activity.
+#         if (ii == 1) {
+#           weeksteps = daysteps
+#           week.met.list = daycrit.met
+# 
+#           weekActiveMinLight = dayActiveMinLight
+#           weekActiveminfair = dayActiveminfair
+#           weekActiveminMod2Vig = dayActiveminMod2Vig
+#           weekActiveminSum = dayActiveminSum
+# 
+#         } else {
+#           weeksteps = append(weeksteps, daysteps)
+#           week.met.list= append(week.met.list, daycrit.met )
+# 
+#           weekActiveMinLight = append(weekActiveMinLight, dayActiveMinLight)
+#           weekActiveminfair = append(weekActiveminfair, dayActiveminfair)
+#           weekActiveminMod2Vig = append(weekActiveminMod2Vig, dayActiveminMod2Vig)
+#           weekActiveminSum = append(weekActiveminSum, dayActiveminSum)
+# 
+#         }
+# 
+# 
+#       }
+#     ##Whether that ratio above the minimum required:
+#     timestest$include[i] <- (sum(week.met.list == TRUE) > needed.to.include)
+#     timestest$meanweeksteps[i] = mean(weeksteps)
+#     timestest$meanweekActiveMinLight[i] = mean(weekActiveMinLight)
+#     timestest$meanweekActiveminfair[i] = mean(weekActiveminfair)
+#     timestest$meanweekActiveminMod2Vig[i] = mean(weekActiveminMod2Vig)
+#     timestest$meanweekActiveminSum[i] = mean(weekActiveminSum)
+# 
+#     timestest$sumweeksteps[i] = sum(weeksteps, na.rm=TRUE)
+#     timestest$sumweekActiveMinLight[i] = sum(weekActiveMinLight, na.rm=TRUE)
+#     timestest$sumweekActiveminfair[i] = sum(weekActiveminfair, na.rm=TRUE)
+#     timestest$sumweekActiveminMod2Vig[i] = sum(weekActiveminMod2Vig, na.rm=TRUE)
+#     timestest$sumweekActiveminSum[i] = sum(weekActiveminSum, na.rm=TRUE)
+# 
+#   }
+# }
+# 
+# # timestest$weekActiveminfair = NULL
+# # timestest$weekActiveMinLight = NULL
+# # timestest$weekActiveminMod2Vig = NULL
+# # timestest$weekActiveminSum = NULL
+# 
+# 
+# 
+file2name = paste(files2analyse, "valid_Step_Weeks.csv", sep = "") #last run Now 11, as a time saver
+# write.csv(timestest, file2name) #, rownames = FALSE)
+
+df.vscores.steps = read.csv(file2name, header = TRUE, sep = ",")
+df.vscores.steps$X = NULL
+
+```
+
+
+```{r format_V_Scores}
+#Remove withdrawn patients
+df.vscores.steps = df.vscores.steps[,!names(df.vscores.steps) %in% c("End.Date")]
+
+
+
+#Provide week numbers 
+weeklabs = c("PreSx02", "PreSx01", "PostSx01", "PostSx02","PostSx03", "PostSx04", "PostSx05", "PostSx06", "PostSx07", "PostSx08", "PostSx09", "PostSx10", "PostSx11", "PostSx12" )
+newtimenames = weeklabs
+oldtimenames = c("Tneg2_Start", "Tneg1_start", "Tpos1_start", "Tpos2_start", "Tpos3_start", "Tpos4_start", "Tpos5_start", "Tpos6_start", "Tpos7_start", "Tpos8_start", "Tpos9_start", "Tpos10_start", "Tpos11_start", "Tpos12_start")
+#length(oldtimenames)
+#length(newtimenames)
+for (variable in 1:14) {
+  #df$var[df$var<x]  <- "unknown" 
+  levels(df.vscores.steps$timepoint)[levels(df.vscores.steps$timepoint) == oldtimenames[variable]] <- newtimenames[variable]
+}
+
+#unique(df.vscores.steps$timepoint)
+
+## Remove rows where "include" is FALSE
+#d<-d[!(d$A=="B"]
+#Faking it for speed#df.vscores.steps$include = TRUE
+df.vscores.steps.trimmed = df.vscores.steps[(df.vscores.steps$include == TRUE),]
+
+
+```
+
+``` {r DisplayVScoresWithout0stepWeeks}
+require(ggplot2)
+
+#names(df.vscores.steps.trimmed)
+knit.desc = NULL
+loop = c(5:17, 21)
+for (i in loop){ 
+  #i=5
+
+  figtitl = names(df.vscores.steps.trimmed)[i]
+  
+  df.temp = data.frame(df.vscores.steps.trimmed$Username, df.vscores.steps.trimmed$timepoint, as.numeric(as.character(df.vscores.steps.trimmed[,i])))
+  names (df.temp) = c("Username", "WeekNum", "ii")
+  
+  p = ggplot(data = df.temp, 
+             aes (x = as.factor(WeekNum), y = ii)
+             ) 
+  ## Labelling the Axes, Title, Tags
+  p = p + xlab("Weeks")
+  p = p + ylab (figtitl)
+  p = p + labs(title = figtitl, tag = (i-5))
+  p = p + scale_x_discrete(limits=weeklabs)
+  p = p + theme(axis.text.x = element_text(angle = 90))
+  
+  ## Setting Axes Limits
+  p = p + ylim(0, 100)
+  
+  
+  ## Print it
+  q = plot(p + geom_boxplot())
+ 
+  
+   knit.desc = NULL
+   ## Describe it
+  desc.vtot = describeBy(x=df.temp$ii, group = as.factor(df.temp$WeekNum))
+  knit.desc = desc.vtot
+  
+  knit.desc = rbind(desc.vtot$PreSx02, desc.vtot$PreSx01)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx01)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx02)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx03)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx04)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx05)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx06)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx07)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx08)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx09)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx10)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx11)
+  knit.desc = rbind(knit.desc, desc.vtot$PostSx12)
+  rownames(knit.desc) = weeklabs
+  
+  print(knitr::kable(knit.desc, format = "markdown"))
+    
+  
+ 
+  }
+```
+
+
+# Research Question 1: 
+Does continuous access to a web-based portal with activity monitoring, goal setting, and disease risk prediction profiling for heart diseases, type 2 diabetes, arthritis, lung disease, low back pain, depression, and happiness (Vivametrica technology) 
+•	Vivametrica group VS ABJHI Controls
+•	Treat section as a lesson learned for implementation
+  o	Address barriers to implementation and adoption
+•	Run analysis anyways and say that we can’t take it for gospel;; Ania
+
+a)	mediate levels of patient reported outcomes (pain, joint stiffness, disability, and quality of life) within 3-months post-TKA 
+  o	Mixed methods ANOVA: 
+    	IV: [Vivametrica VS Control]
+    	DV: EQ5D3L total scores @ [Baseline to 3mo]
+    	Post hoc: Tukey’s
+  o	Mixed methods ANOVA: 
+    	IV: [Vivametrica VS Control]
+    	DV: WOMAC total scores @ [Baseline to 3mo]
+    	Post hoc: Tukey’s
+
+b)	mediate patient satisfaction at 6 weeks post-TKA?
+  o	Two-sided T-test: 6 week satisfaction on [Vivametrica VS control]
+
+*This analysis requires: Survey data from ABJHI
+
+
+
+## RQ1 Prep
+
+```{r Prep_RedcapVivaOnly}
+filename = paste(files2analyse, "RedCap_Export_VivaOnly.csv", sep = "")
+df.surveyresp = data.frame(read.csv2(file = filename, sep = ","))
+
+#Remove extraneous participants
+#d<-d[!(d$A=="B" & d$E==0),]
+df.surveyscore  = df.surveyresp[ -which(as.character(df.surveyresp$participant_id) %in% as.character(c("", "016398224", "07573", "BLANK", "Charles McIndoo"))), ]
+
+
+df.surveyscore$participant_id = gsub(" ", "", df.surveyscore$participant_id, fixed = TRUE)
+df.surveyscore$participant_id = gsub("Post", "post", df.surveyscore$participant_id, fixed = TRUE)
+df.surveyscore$participant_id = gsub("v", "V", df.surveyscore$participant_id, fixed = TRUE)
+
+df.surveyscore$patientId = df.surveyscore$participant_id
+df.surveyscore$patientId = as.factor(substr(df.surveyscore$patientId, 1,3))
+df.surveyscore = df.surveyscore[ -which(as.character(df.surveyscore$patientId) %in% c(as.character(withdrawals$patientId), "V80")), ]
+
+df.surveyscore  = df.surveyscore[ -which(is.na(df.surveyscore$session)), ]
+df.surveyscore = df.surveyscore [- which(df.surveyscore$session == "SX"), ]
+
+
+
+
+# utils::View(df.surveyscore)
+#utils::View(trackingsesh)
+
+#utils::View(df.surveyresp)
+
+#scoring EQ5d3l  
+#https://euroqol.org/docs/EQ-5D-5L-User-Guide.pdf
+for (i in c(1:nrow(df.surveyscore))) {
+  df.surveyscore$eq5d5lcode[i] = paste(as.character(df.surveyscore$eq5d5l_mobility[i]), 
+                                    as.character(df.surveyscore$eq5d5l_selfcare[i]), 
+                                    as.character(df.surveyscore$eq5d5l_usualactivities[i]), 
+                                    as.character(df.surveyscore$eq5d5l_paindiscomfort[i]), 
+                                    as.character(df.surveyscore$eq5d5l_anxietydepression[i]),
+                                    sep = "")
+}
+
+
+#scoring WOMAC
+for (i in c(1:nrow(df.surveyscore))) {
+  df.surveyscore$womacpaintot[i] = sum(
+    df.surveyscore$womac_pain_1[i],
+    df.surveyscore$womac_pain_2[i],
+    df.surveyscore$womac_pain_3[i],
+    df.surveyscore$womac_pain_4[i],
+    df.surveyscore$womac_pain_5[i]
+  )
+}
+
+for (i in c(1:nrow(df.surveyscore))) {
+  df.surveyscore$womacstifftot[i] = sum(
+    df.surveyscore$womac_stiff_1[i], 
+    df.surveyscore$womac_stiff_2[i]
+  )
+}
+
+for (i in c(1:nrow(df.surveyscore))) {
+  df.surveyscore$womacstfxntot[i] = sum(
+    df.surveyscore$womac_function_1[i], 
+    df.surveyscore$womac_function_2[i],
+    df.surveyscore$womac_function_3[i],
+    df.surveyscore$womac_function_4[i],
+    df.surveyscore$womac_function_5[i],
+    df.surveyscore$womac_function_6[i],
+    df.surveyscore$womac_function_7[i],
+    df.surveyscore$womac_function_8[i],
+    df.surveyscore$womac_function_9[i],
+    df.surveyscore$womac_function_10[i],
+    df.surveyscore$womac_function_11[i],
+    df.surveyscore$womac_function_12[i],
+    df.surveyscore$womac_function_13[i],
+    df.surveyscore$womac_function_14[i],
+    df.surveyscore$womac_function_15[i],
+    df.surveyscore$womac_function_16[i],
+    df.surveyscore$womac_function_17[i]
+  )
+}
+
+
+for (i in c(1:nrow(df.surveyscore))) {
+  df.surveyscore$womactot[i] = sum(
+    df.surveyscore$womacpaintot[i], 
+    df.surveyscore$womacstifftot[i],
+    df.surveyscore$womacstfxntot[i]           
+  )
+}
+
+
+
+##Commented these out because we can calculate them later with the matched data. see below. 
+
+# womacpain = describeBy(df.surveyscore$womacpaintot, group = df.surveyscore$session)
+# describeBy(df.surveyscore$womacstifftot, group = df.surveyscore$session)
+# describeBy(df.surveyscore$womacstfxntot, group = df.surveyscore$session)
+# describeBy(df.surveyscore$womacto, group = df.surveyscore$sessiont)
+# 
+# 
+# df.survey.summary = data.frame(
+#   rbind(
+#     
+#     ), row.names = c("WOMACPain PreSurgery","WOMACPain PostSurgery",
+#                      "WOMACStiffness PreSurgery", "WOMACStifness PostSurgery",
+#                      "WOMACFunction PreSurgery", "WOMACFunction PostSurgery",
+#                      "WOMACTotal PreSurgery", "WOMACTotal PostSurgery")
+#   )
+# 
+# 
+# knitr::kable(df.survey.summary, format = "markdown")
+
+
+```
+
+## RQ1 Normality Testing of Differences for Dependent t-tests
+```{r}
+## dependent t-tests for pre and post surgery
+## Paired t-test only valid when the difference is normally distributed. 
+
+## Trim down to only necessary columns
+df.surveyscore.trim = data.frame(
+  "patientId" = df.surveyscore$patientId,
+  "session"  = factor(df.surveyscore$session, exclude = "SX"),
+  "eq5d5l_vas"  = df.surveyscore$eq5d5l_vas,
+  "eq5d5lcode" = df.surveyscore$eq5d5lcode, 
+  "womacpaintot" = df.surveyscore$womacpaintot, 
+  "womacstifftot" = df.surveyscore$womacstifftot, 
+  "womacstfxntot" = df.surveyscore$womacstfxntot, 
+  "womactot" = df.surveyscore$womactot
+  
+)
+# require(tidyr)
+# df.surveyscore.trim$session = fct_rev(df.surveyscore.trim$session) #should reverse factors, not working. Too tired
+
+## reshape to wide
+df.surveyscore.trim.wide = reshape(df.surveyscore.trim, idvar = "patientId", timevar = "session", direction = "wide", 
+        v.names = c("womacpaintot", "womacstifftot", "womacstfxntot", "womactot", "eq5d5l_vas"))
+
+
+## Calculate differences 
+df.survey.diffs = data.frame(
+  "patientId" = df.surveyscore.trim.wide$patientId,
+  "womacpain" = (df.surveyscore.trim.wide$womacpaintot.PostSx12 - df.surveyscore.trim.wide$womacpaintot.PreSx02), 
+  "womacstiff" = (df.surveyscore.trim.wide$womacstifftot.PostSx12 - df.surveyscore.trim.wide$womacstifftot.PreSx02), 
+  "womacfxn" = (df.surveyscore.trim.wide$womacstfxntot.PostSx12 - df.surveyscore.trim.wide$womacstfxntot.PreSx02), 
+  "womactot" = (df.surveyscore.trim.wide$womactot.PostSx12 - df.surveyscore.trim.wide$womactot.PreSx02), 
+  "eqvas" = (df.surveyscore.trim.wide$eq5d5l_vas.PostSx12 - df.surveyscore.trim.wide$eq5d5l_vas.PreSx02)
+)
+
+
+
+```
+
+## RQ1 Paired t-tests with figures
+``` {r}
+colour.dens = "black"
+colour.background = "lightgrey"
+fontsize = 11 
+fonttype = "TT Arial"
+figsize = 1200
+fight = 5
+figwid = 7 
+figunit = "in"
+
+require(ggplot2)
+require(gridExtra)
+# Pain Scores Density and QQ
+plot1 = ggplot(data = df.survey.diffs, aes(x = womacpain)) + 
+            geom_density() +
+            labs(title = "Differences between WOMAC Pain Scores",
+                 subtitle = "Density Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery",
+                 x = "Difference", y = "Count") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+
+plot2 = ggplot(df.survey.diffs, aes(sample = womacpain)) +  
+            stat_qq(col='blue') + 
+            stat_qq_line(col=colour.dens) + 
+            labs(title = "Differences between Womac Pain Scores",
+                 subtitle = "Normal Probability Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery", #not sure if we want to add this
+                 x = "Difference", y = "Density") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+grid.arrange(plot1, plot2, ncol=2)
+
+# Pain Shapiro-Wilks Test
+shapiro.test(df.survey.diffs$womacpain)
+
+
+# paired t-test/Wilcoxon signed rank sum test
+t.test(df.surveyscore.trim.wide$womacpaintot.PostSx12, df.surveyscore.trim.wide$womacpaintot.PreSx02, paired = TRUE, alternative = "two.sided")
+
+# Boxplots with trajectories
+ytex = "WOMAC Pain Rating"
+#xtex = "Mean Week Steps"
+
+ggplot(data = df.surveyscore.trim, aes(x = forcats::fct_rev(session), y = womacpaintot)) + 
+  geom_boxplot(alpha = .5) +
+  geom_point(size = 2) + 
+  geom_line(aes(group = patientId)) +
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  geom_jitter(width = .05, alpha = .4)+
+  labs(title = ytex,
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = ytex)+
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+          # ylim(0, 100) +
+          scale_x_discrete(name  = "",
+                                  breaks=c("PreSx02", "PostSx12"),
+                                  labels=c("Pre-TKA", "Post-TKA")) #+
+#           scale_shape_discrete(name  ="",
+#                                   breaks=c("PreSx02", "PostSx12"),
+#                                   labels=c("Pre-TKA", "Post-TKA"))
+
+
+ggsave(paste("RQ1", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+
+# if the sessions appear in the wrong order, look for "fct_rev()"
+
+``` 
+
+``` {r}
+
+# Stiffness Scores Density and QQ
+plot1 = ggplot(data = df.survey.diffs, aes(x = womacstiff)) + 
+            geom_density() +
+            labs(title = "Differences between WOMAC Stiffness Scores",
+                 subtitle = "Density Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery",
+                 x = "Difference", y = "Count") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+
+plot2 = ggplot(df.survey.diffs, aes(sample = womacstiff)) +  
+            stat_qq(col='blue') + 
+            stat_qq_line(col=colour.dens) + 
+            labs(title = "Differences between Womac Stiffness Scores",
+                 subtitle = "Normal Probability Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery", #not sure if we want to add this
+                 x = "Difference", y = "Density") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+grid.arrange(plot1, plot2, ncol=2)
+
+# Pain Shapiro-Wilks Test
+shapiro.test(df.survey.diffs$womacstiff)
+
+
+t.test(df.surveyscore.trim.wide$womacstifftot.PostSx12, df.surveyscore.trim.wide$womacstifftot.PreSx02, paired = TRUE, alternative = "two.sided")
+
+
+
+
+# Boxplots with trajectories
+ytex = "WOMAC Stiffness Rating"
+#xtex = "Mean Week Steps"
+
+ggplot(data = df.surveyscore.trim, aes(x = forcats::fct_rev(session), y = womacstifftot)) + 
+  geom_boxplot(alpha = .5) +
+  geom_point(size = 2) + 
+  geom_line(aes(group = patientId)) +
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  geom_jitter(width = .05, alpha = .4)+
+  labs(title = ytex,
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = ytex)+
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+          # ylim(0, 100) +
+          scale_x_discrete(name  = "",
+                                  breaks=c("PreSx02", "PostSx12"),
+                                  labels=c("Pre-TKA", "Post-TKA")) #+
+#           scale_shape_discrete(name  ="",
+#                                   breaks=c("PreSx02", "PostSx12"),
+#                                   labels=c("Pre-TKA", "Post-TKA"))
+
+
+ggsave(paste("RQ1", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+
+``` {r}
+
+# Function Scores Density and QQ
+plot1 = ggplot(data = df.survey.diffs, aes(x = womacfxn)) + 
+            geom_density() +
+            labs(title = "Differences between WOMAC Function Scores",
+                 subtitle = "Density Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery",
+                 x = "Difference", y = "Count") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+
+plot2 = ggplot(df.survey.diffs, aes(sample = womacfxn)) +  
+            stat_qq(col='blue') + 
+            stat_qq_line(col=colour.dens) + 
+            labs(title = "Differences between Womac Function Scores",
+                 subtitle = "Normal Probability Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery", #not sure if we want to add this
+                 x = "Difference", y = "Density") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+grid.arrange(plot1, plot2, ncol=2)
+
+# Pain Shapiro-Wilks Test
+shapiro.test(df.survey.diffs$womacfxn)
+
+t.test(df.surveyscore.trim.wide$womacstfxntot.PostSx12, df.surveyscore.trim.wide$womacstfxntot.PreSx02, paired = TRUE, alternative = "two.sided")
+
+
+
+# Boxplots with trajectories
+ytex = "WOMAC Function Rating"
+#xtex = "Mean Week Steps"
+
+ggplot(data = df.surveyscore.trim, aes(x = forcats::fct_rev(session), y = womacstfxntot)) + 
+  geom_boxplot(alpha = .5) +
+  geom_point(size = 2) + 
+  geom_line(aes(group = patientId)) +
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  geom_jitter(width = .05, alpha = .4)+
+  labs(title = ytex,
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = ytex)+
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+          # ylim(0, 100) +
+          scale_x_discrete(name  = "",
+                                  breaks=c("PreSx02", "PostSx12"),
+                                  labels=c("Pre-TKA", "Post-TKA")) #+
+#           scale_shape_discrete(name  ="",
+#                                   breaks=c("PreSx02", "PostSx12"),
+#                                   labels=c("Pre-TKA", "Post-TKA"))
+
+
+ggsave(paste("RQ1", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+
+``` {r}
+
+# Total Scores Density and QQ
+plot1 = ggplot(data = df.survey.diffs, aes(x = womactot)) + 
+            geom_density() +
+            labs(title = "Differences between WOMAC Total Scores",
+                 subtitle = "Density Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery",
+                 x = "Difference", y = "Count") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+
+plot2 = ggplot(df.survey.diffs, aes(sample = womactot)) +  
+            stat_qq(col='blue') + 
+            stat_qq_line(col=colour.dens) + 
+            labs(title = "Differences between Womac Total Scores",
+                 subtitle = "Normal Probability Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery", #not sure if we want to add this
+                 x = "Difference", y = "Density") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+grid.arrange(plot1, plot2, ncol=2)
+
+# Pain Shapiro-Wilks Test
+shapiro.test(df.survey.diffs$womactot)
+
+
+t.test(df.surveyscore.trim.wide$womactot.PostSx12, df.surveyscore.trim.wide$womactot.PreSx02, paired = TRUE, alternative = "two.sided")
+
+
+
+
+# Boxplots with trajectories
+ytex = "WOMAC Total Rating"
+#xtex = "Mean Week Steps"
+
+ggplot(data = df.surveyscore.trim, aes(x = forcats::fct_rev(session), y = womactot)) + 
+  geom_boxplot(alpha = .5) +
+  geom_point(size = 2) + 
+  geom_line(aes(group = patientId)) +
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  geom_jitter(width = .05, alpha = .4)+
+  labs(title = ytex,
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = ytex)+
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+          # ylim(0, 100) +
+          scale_x_discrete(name  = "",
+                                  breaks=c("PreSx02", "PostSx12"),
+                                  labels=c("Pre-TKA", "Post-TKA")) #+
+#           scale_shape_discrete(name  ="",
+#                                   breaks=c("PreSx02", "PostSx12"),
+#                                   labels=c("Pre-TKA", "Post-TKA"))
+
+
+ggsave(paste("RQ1", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+
+
+```
+
+
+``` {r}
+
+## EQ5D5L Vas differences
+plot1 = ggplot(data = df.survey.diffs, aes(x = eqvas)) + 
+            geom_density() +
+            labs(title = "Differences between EQ5D5L VAS (rating out of 100)",
+                 subtitle = "Density Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery",
+                 x = "Difference", y = "Count") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+
+plot2 = ggplot(df.survey.diffs, aes(sample = womacpain)) +  
+            stat_qq(col='blue') + 
+            stat_qq_line(col=colour.dens) + 
+            labs(title = "Differences between EQ5D5L VAS (rating out of 100)",
+                 subtitle = "Normal Probability Plot",
+                 caption = "12 weeks post surgery minus 2 weeks pre surgery", #not sure if we want to add this
+                 x = "Difference", y = "Density") +
+            theme(plot.title = element_text(size=15, face="bold", margin = margin(10, 0, 10, 0)),
+                  axis.title.x = element_text(color=colour.dens),#, vjust=-0.35),
+                  axis.title.y = element_text(color=colour.dens),# , vjust=0.35), 
+                  panel.background = element_rect(fill = colour.background)
+                  )  
+grid.arrange(plot1, plot2, ncol=2)
+
+# Pain Shapiro-Wilks Test
+shapiro.test(df.survey.diffs$eqvas)
+
+wilcox.test(df.surveyscore.trim.wide$eq5d5l_vas.PostSx12, df.surveyscore.trim.wide$eq5d5l_vas.PreSx02, alternative = "two.sided")
+
+
+# (psesheqvas = ggplot(data = df.surveyscore.trim, aes(x = session, y = eq5d5l_vas)) + 
+#   geom_boxplot(alpha = .5) +
+#   geom_point(size = 2) + 
+#   geom_line(aes(group = patientId)) +
+#   geom_smooth(method = "lm", fill = NA, size = 2) + 
+#   geom_jitter(width = .05, alpha = .4)+
+#   labs(title ="EQ5D5L VAS",
+#                  subtitle = "Box plot with Jittered Points",
+#                  caption ="",
+#                  x = "Session", y = "EQ VAS")
+# )
+
+
+
+# Boxplots with trajectories
+ytex = "EQ5D5L Visual Analogue Scale Rating"
+#xtex = "Mean Week Steps"
+
+ggplot(data = df.surveyscore.trim, aes(x = forcats::fct_rev(session), y = eq5d5l_vas)) + 
+  geom_boxplot(alpha = .5) +
+  geom_point(size = 2) + 
+  geom_line(aes(group = patientId)) +
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  geom_jitter(width = .05, alpha = .4)+
+  labs(title = ytex,
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = ytex)+
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+          # ylim(0, 100) +
+          scale_x_discrete(name  = "",
+                                  breaks=c("PreSx02", "PostSx12"),
+                                  labels=c("Pre-TKA", "Post-TKA")) #+
+#           scale_shape_discrete(name  ="",
+#                                   breaks=c("PreSx02", "PostSx12"),
+#                                   labels=c("Pre-TKA", "Post-TKA"))
+
+
+ggsave(paste("RQ1", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+
+
+```
+
+
+## ABJHI Matching
+Was done by hand and is completed. 
+```{r}
+# matched = read.csv("E:/ABJHI Vivametrica Secure/_Analysis/CSVs_to_analyse/Vivametrica Matched 20191028 one2two.csv")
+
+matched = read.csv("E:/ABJHI Vivametrica Secure/_Analysis/CSVs_to_analyse/Vivametrica Matched 20191028 one2two_edited.csv")
+
+
+## trim down number of variables in matched data (review data dictionary)
+## Split EQ/WOMAC and satsifaction into separate dfs
+## sync up the naming conventions for pre and post WOMAC and EQ
+utils::View(matched)
+df.quest.trim.wide = data.frame(
+  "patientId" = matched$patientId,
+  "cohort" = NA,
+  "womacpaintot.PostSx12" = matched$post3MSurveyWomacPainScore, 
+  "womacpaintot.PreSx02"  = matched$preSurgeryWomacPainScore, 
+  "womacstifftot.PostSx12" = matched$post3MSurveyWomacStiffScore, 
+  "womacstifftot.PreSx02" = matched$preSurgeryWomacStiffScore, 
+  "womacstfxntot.PostSx12" = matched$post3MSurveyWomacFunctionScore, 
+  "womacstfxntot.PreSx02" = matched$preSurgeryWomacFunctionScore, 
+  "womactot.PostSx12" = matched$post3MSurveyWomacOverallScore, 
+  "womactot.PreSx02" = matched$preSurgeryWomacOverallScore, 
+  "eq5d5l_vas.PostSx12" = matched$post3MSurveyEq5dVAS, 
+  "eq5d5l_vas.PreSx02" = matched$preSurgeryEq5dVAS
+)
+
+for (row in 1:nrow(df.quest.trim.wide)) {
+  if (substr(as.character(df.quest.trim.wide$patientId[row]), 1, 1) == "V" ) {
+    df.quest.trim.wide$cohort[row] = "Vivametrica"
+  } else {df.quest.trim.wide$cohort[row] = "Control"}
+}
+
+
+
+df.satis = data.frame(
+  "patientId" = matched$patientId
+  
+)
+
+## find differences in the names of these two dfs for EQ and WOMAC
+matched.viva = df.quest.trim.wide[df.quest.trim.wide$cohort == "Vivametrica",] # this data is much less complete than what I collected. 
+# utils::View(matched.viva[order(matched.viva$patientId),])
+#therefore, i'll have to remove it and place in our data
+df.quest.trim.wide.controls = df.quest.trim.wide[df.quest.trim.wide$cohort == "Control", ]
+
+df.surveyscore.trim.wide$cohort = "Vivametrica"
+
+
+##insert the scores from both to match
+df.surveyscore.trim.wide$eq5d5lcode = NULL
+df.matchsurveys = rbind (df.surveyscore.trim.wide, df.quest.trim.wide.controls)
+# utils::View(df.matchsurveys)
+
+```
+## Matching demographics
+```{r}
+#the original file from ABJHI
+files2analyse = "E:/ABJHI Vivametrica Secure/_Analysis/CSVs_to_analyse/"
+filename = paste(files2analyse, "matching_cntrl_cohort.csv", sep = "")
+df.abjhi.matches = data.frame(read.csv2(file = filename, sep = ",",
+                                        header = TRUE, fileEncoding="UTF-8-BOM"))
+
+
+filename = paste(files2analyse, "Vivametrica Matched&unmatched 20191218 one2two_edited.csv", sep = "")
+df.matchedandunmatched = data.frame(read.csv2(file = filename, sep = ",",
+                                        header = TRUE, fileEncoding="UTF-8-BOM"))
+
+require (psych)
+```
+
+```{r}
+require (psych)
+(df = describeBy (df.matchsurveys, group = df.matchsurveys$cohort))
+df.desc.control = df[1]
+df.desc.viva = df[2]
+
+```
+
+```{r}
+df.match.pre = data.frame(
+  "patientId"=df.matchsurveys$patientId, 
+  "womacpaintot" = df.matchsurveys$womacpaintot.PreSx02, 
+  "womacstifftot" = df.matchsurveys$womacstifftot.PreSx02,  
+  "womacstfxntot" = df.matchsurveys$womacstfxntot.PreSx02, 
+  "womactot" = df.matchsurveys$womactot.PreSx02, 
+  "eq5d5l_vas" = df.matchsurveys$eq5d5l_vas.PreSx02,     
+  "cohort" = df.matchsurveys$cohort, 
+  "session" = "PreSx02"
+)
+
+df.matchpost = data.frame(
+  "patientId"=df.matchsurveys$patientId, 
+  "womacpaintot" = df.matchsurveys$womacpaintot.PostSx12, 
+  "womacstifftot" = df.matchsurveys$womacstifftot.PostSx12, 
+  "womacstfxntot" = df.matchsurveys$womacstfxntot.PostSx12, 
+  "womactot" = df.matchsurveys$womactot.PostSx12, 
+  "eq5d5l_vas" = df.matchsurveys$eq5d5l_vas.PostSx12, 
+  "cohort" = df.matchsurveys$cohort, 
+  "session" = "PostSx12"
+)
+
+df.match.long = rbind(df.match.pre, df.matchpost)
+df.match.long$between = paste(df.match.long$cohort, df.match.long$session)
+
+
+```
+
+## RQ1  modeling
+
+```{r}
+# Pain
+# Two-Way Repeated Measures ANOVA
+aov1 =aov(womacpaintot ~ cohort * session + 
+            Error(patientId / (cohort * session)), data =df.match.long)
+summary(aov1)
+
+
+#Assumption Testing 
+# https://stats.stackexchange.com/questions/6081/testing-the-normality-assumption-for-repeated-measures-anova-in-r
+# 1. Homogeneity of variances
+# plot(aov1, 1)# doesn't work
+# library(car)
+# leveneTest(womacpaintot ~ cohort * session + 
+#             Error(patientId / (cohort * session)), data =df.match.long) # also doesn't work for repeated measures
+
+## Residual plot
+plot(fitted(aov1[[3]]), resid(aov1[[3]]))
+abline(h=0, lty=2)
+oats.pr <- proj(aov1)
+qqnorm(oats.pr[[3]][, "Residuals"], ylab = "Stratum 4 residuals")
+qqline(oats.pr[[3]][, "Residuals"])
+
+
+ggplot(data = df.match.long, aes(x = session, y = womacpaintot)) + 
+            geom_boxplot(alpha = .5) +
+            facet_wrap(facets = "cohort") + 
+            geom_point(size = 2) + 
+            geom_line(aes(group = patientId)) +
+            # geom_jitter(width = .05, alpha = .4)+
+            labs(title = "WOMAC Pain",
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = "WOMAC Pain")
+
+  
+```
+
+```{r}
+# Stiffness
+# Two-Way Repeated Measures ANOVA
+aov1 = with(df.match.long, 
+      aov(womacstifftot ~ cohort * session + 
+            Error(patientId / (cohort * session)))
+     )
+summary(aov1)
+
+#Assumption Testing 
+# https://stats.stackexchange.com/questions/6081/testing-the-normality-assumption-for-repeated-measures-anova-in-r
+# 1. Homogeneity of variances
+# plot(aov1, 1)# doesn't work
+# library(car)
+# leveneTest(womacpaintot ~ cohort * session + 
+#             Error(patientId / (cohort * session)), data =df.match.long) # also doesn't work for repeated measures
+
+## Residual plot
+plot(fitted(aov1[[3]]), resid(aov1[[3]]))
+abline(h=0, lty=2)
+oats.pr <- proj(aov1)
+qqnorm(oats.pr[[3]][, "Residuals"], ylab = "Stratum 4 residuals")
+qqline(oats.pr[[3]][, "Residuals"])
+
+
+ggplot(data = df.match.long, aes(x = session, y = womacstifftot)) + 
+            geom_boxplot(alpha = .5) +
+            facet_wrap(facets = "cohort") + 
+            geom_point(size = 2) + 
+            geom_line(aes(group = patientId)) +
+            # geom_jitter(width = .05, alpha = .4)+
+            labs(title = "WOMAC Stiffness",
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = "WOMAC Stiffness")
+
+  
+```
+
+
+
+```{r}
+# Function
+# Two-Way Repeated Measures ANOVA
+aov1 = with(df.match.long, 
+      aov(womacstfxntot ~ cohort * session + 
+            Error(patientId / (cohort * session)))
+     )
+summary(aov1)
+
+#Assumption Testing 
+# https://stats.stackexchange.com/questions/6081/testing-the-normality-assumption-for-repeated-measures-anova-in-r
+# 1. Homogeneity of variances
+# plot(aov1, 1)# doesn't work
+# library(car)
+# leveneTest(womacpaintot ~ cohort * session + 
+#             Error(patientId / (cohort * session)), data =df.match.long) # also doesn't work for repeated measures
+
+## Residual plot
+plot(fitted(aov1[[3]]), resid(aov1[[3]]))
+abline(h=0, lty=2)
+oats.pr <- proj(aov1)
+qqnorm(oats.pr[[3]][, "Residuals"], ylab = "Stratum 4 residuals")
+qqline(oats.pr[[3]][, "Residuals"])
+
+
+ggplot(data = df.match.long, aes(x = session, y = womacstfxntot)) + 
+            geom_boxplot(alpha = .5) +
+            facet_wrap(facets = "cohort") + 
+            geom_point(size = 2) + 
+            geom_line(aes(group = patientId)) +
+            # geom_jitter(width = .05, alpha = .4)+
+            labs(title = "WOMAC Function",
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = "WOMAC Function")
+```
+
+
+```{r}
+# Total
+# Two-Way Repeated Measures ANOVA
+
+
+# aov1 = aov(womactot ~ cohort + session + cohort * session + 
+#             Error(patientId / (cohort * session)), data = df.match.long)
+# summary(aov1)
+# 
+# library (ez)
+# ezANOVA(data = df.test, wid=.(patientId), dv=.(womactot),
+#          within=.(session), between=.(cohort))#, observed=.(sex))
+
+#*****************
+#one effect reported per test
+df.test = na.omit(data.frame(
+       "patientId" = df.match.long$patientId, 
+       "womactot" = df.match.long$womactot, 
+       "cohort" = df.match.long$cohort, 
+       "session" = df.match.long$session
+  ))
+df.test = df.test[df.test$patientId %in% names(which(table(df.test$patientId) >1)),]
+aov1 =aov(womactot ~ cohort * session + 
+            Error(patientId / (cohort * session)), data = df.test)
+summary(aov1)
+
+
+
+
+#Assumption Testing 
+# https://stats.stackexchange.com/questions/6081/testing-the-normality-assumption-for-repeated-measures-anova-in-r
+# 1. Homogeneity of variances
+# plot(aov1, 1)# doesn't work
+# library(car)
+# leveneTest(womacpaintot ~ cohort * session + 
+#             Error(patientId / (cohort * session)), data =df.match.long) # also doesn't work for repeated measures
+
+## Residual plot
+plot(fitted(aov1[[3]]), resid(aov1[[3]]))
+abline(h=0, lty=2)
+oats.pr <- proj(aov1)
+qqnorm(oats.pr[[3]][, "Residuals"], ylab = "Stratum 4 residuals")
+qqline(oats.pr[[3]][, "Residuals"])
+
+
+ggplot(data = df.match.long, aes(x = session, y = womactot)) + 
+            geom_boxplot(alpha = .5) +
+            facet_wrap(facets = "cohort") + 
+            geom_point(size = 2) + 
+            geom_line(aes(group = patientId)) +
+            # geom_jitter(width = .05, alpha = .4)+
+            labs(title = "WOMAC Total Score",
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = "WOMAC Total")
+```
+
+```{r}
+#EQ
+#one effect reported per test
+df.test = #na.omit(
+  data.frame(
+       "patientId" = df.match.long$patientId, 
+       "eq5d5l_vas" = as.numeric(df.match.long$eq5d5l_vas), 
+       "cohort" = df.match.long$cohort, 
+       "session" = df.match.long$session
+  )
+#)
+df.test = df.test[df.test$patientId %in% names(which(table(df.test$patientId) >1)),]
+aov1 =aov(eq5d5l_vas ~ cohort * session + 
+            Error(patientId / (cohort * session)), data = df.test)
+summary(aov1)
+
+
+
+
+#Assumption Testing 
+# https://stats.stackexchange.com/questions/6081/testing-the-normality-assumption-for-repeated-measures-anova-in-r
+# 1. Homogeneity of variances
+# plot(aov1, 1)# doesn't work
+# library(car)
+# leveneTest(womacpaintot ~ cohort * session + 
+#             Error(patientId / (cohort * session)), data =df.match.long) # also doesn't work for repeated measures
+
+## Residual plot
+plot(fitted(aov1[[3]]), resid(aov1[[3]]))
+abline(h=0, lty=2)
+oats.pr <- proj(aov1)
+qqnorm(oats.pr[[3]][, "Residuals"], ylab = "Stratum 4 residuals")
+qqline(oats.pr[[3]][, "Residuals"])
+
+
+ggplot(data = df.match.long, aes(x = session, y = womactot)) + 
+            geom_boxplot(alpha = .5) +
+            facet_wrap(facets = "cohort") + 
+            geom_point(size = 2) + 
+            geom_line(aes(group = patientId)) +
+            # geom_jitter(width = .05, alpha = .4)+
+            labs(title = "WOMAC Total Score",
+                 subtitle = "Box plot with Jittered Points",
+                 caption ="",
+                 x = "Session", y = "WOMAC Total")
+
+
+
+
+
+fontsize = 11 
+fonttype = "TT Arial"
+figsize = 1200
+fight = 5
+figwid = 7 
+figunit = "in"
+
+# df.rq2$meanweeksteps
+# df.rq2$meanweekActiveminSum
+
+require(gridExtra)
+require(ggplot2)
+
+boxtitle = "WOMAC Total Score"
+cohort = "Vivametrica"
+(ggplot(data = subset(df.match.long, df.match.long$cohort == cohort), aes(x = session, y = womactot)) + 
+            geom_boxplot(alpha = .5) +
+            #facet_wrap(facets = "cohort") + 
+            geom_point(size = 2) + 
+            geom_line(aes(group = patientId)) +
+            # geom_jitter(width = .05, alpha = .4)+
+            labs(title = boxtitle,
+                 subtitle = paste(cohort, "Cohort", sep=" "),
+                 caption ="",
+                 x = "Session", y = boxtitle) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-Surgery", "Post-Surgery")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-Surgery", "Post-Surgery"))
+  )
+ggsave(paste(boxtitle, cohort, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+boxtitle = "WOMAC Total Score"
+cohort = c("Vivametrica", "Control")
+
+for(i in cohort){
+  # print(i)
+  
+  print(ggplot(data = subset(df.match.long, df.match.long$cohort == i), aes(x = session, y = womactot)) + 
+            geom_boxplot(alpha = .5) +
+            #facet_wrap(facets = "cohort") + 
+            geom_point(size = 2) + 
+            geom_line(aes(group = patientId)) +
+            # geom_jitter(width = .05, alpha = .4)+
+            labs(title = boxtitle,
+                 subtitle = paste(i, "Cohort", sep=" "),
+                 caption ="",
+                 x = "", y = boxtitle) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    # scale_colour_discrete(name  = "",
+    #                         breaks=c("PreSx02", "PostSx12"),
+    #                         labels=c("Pre-Surgery", "Post-Surgery")) +
+    scale_x_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+  ggsave(paste("RQ2", boxtitle, i, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+}
+
+
+
+```
+
+# Research Question 2: 
+
+RQ2) Is objectively measured physical activity behavior associated with:
+
+a)	improved patient reported outcomes (pain, joint stiffness, disability, and quality of life) at 6 weeks and 3 months post-TKA and 
+  •	Physical activity behaviour consists of: Steps and minutes active, total distance
+  •	Regression: 
+    	IV: Physical activity behaviour
+    	DV: EQ5D3L total scores @ [Baseline to 3mo]
+  •	Regression: 
+    	IV: Physical activity behaviour 
+    	DV: WOMAC total @ [Baseline to 3mo]
+  •	How to: 
+    	(lm(delta~time2 + time1, data = df))
+    
+b)	patient satisfaction at 6 weeks post TKA?
+  •	Correlation: Physical activity behaviour with Satisfaction @ [6wk]
+  •	Regression:
+    	IV: Physical activity behaviour
+    	DV: Satisfaction @ 6wk
+
+
+## RQ2 Scatter plots
+```{r}
+# utils::View(df.surveyscore.trim)
+# utils::View(df.vscores.steps.trimmed)
+
+df.vscores.activity.prepost = df.vscores.steps.trimmed[(df.vscores.steps.trimmed$timepoint == "PreSx02" | df.vscores.steps.trimmed$timepoint == "PostSx12"), ]
+names(df.vscores.activity.prepost)[1] = "patientId"
+names(df.vscores.activity.prepost)[4] = "session"
+
+df.vscores.activity.prepost = df.vscores.activity.prepost[!is.na(df.vscores.activity.prepost$session), ]
+
+# names(df.surveyscore.trim)
+df.viva.ready = merge(x = df.vscores.activity.prepost, by.x = c("patientId", "session"), 
+                      y = df.surveyscore.trim, by.y = c("patientId", "session"), 
+                      all = TRUE)
+
+# df.rq2.wide = df.viva.ready[order(df.viva.ready$patientId), ]
+
+df.rq2 = df.viva.ready[,c(1, 2, 21:36)]
+# utils::View(df.rq2)
+
+
+# # ggpairs!
+# ggpairs, while cool, will not work bc there are too many variables. 
+
+
+fontsize = 11 
+fonttype = "TT Arial"
+figsize = 1200
+fight = 5
+figwid = 7 
+figunit = "in"
+require (psych)
+describeBy(df.rq2, group = "session")
+
+# df.rq2$meanweeksteps
+# df.rq2$meanweekActiveminSum
+
+require(gridExtra)
+require(ggplot2)
+ytex = "WOMAC Pain Rating"
+xtex = "Mean Week Steps"
+(p1steps = ggplot(data = df.rq2, aes(x = meanweeksteps, y = womacpaintot, color = session, shape = session)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", fill = NA) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 subtitle = "Scatter Plot",
+                 caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+ytex = "WOMAC Stiffness Rating"
+(p2steps = ggplot(data = df.rq2, aes(x = meanweeksteps, y = womacstifftot, color = session, shape = session)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", fill = NA) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 subtitle = "Scatter Plot",
+                 caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+ytex = "WOMAC Function Rating"
+(p3steps = ggplot(data = df.rq2, aes(x = meanweeksteps, y = womacstfxntot, color = session, shape = session)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", fill = NA) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 subtitle = "Scatter Plot",
+                 caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+ytex = "WOMAC Total Score"
+(p4steps = ggplot(data = df.rq2, aes(x = meanweeksteps, y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+
+
+ytex = "WOMAC Pain Rating"
+xtex = "Mean Week Minutes Active"
+(p1active = ggplot(data = df.rq2, aes(x = meanweekActiveminSum, y = womacpaintot, color = session, shape = session)) +
+  geom_point() + 
+  geom_smooth(method = "lm", fill = NA) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 subtitle = "Scatter Plot",
+                 caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+   scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+
+ytex = "WOMAC Stiffness Rating"
+xtex = "Mean Week Minutes Active"
+
+(p2active = ggplot(data = df.rq2, aes(x = meanweekActiveminSum, y = womacstifftot, color = session, shape = session)) +
+  geom_point() + 
+  geom_smooth(method = "lm", fill = NA) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 subtitle = "Scatter Plot", 
+                 caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+
+ytex = "WOMAC Function Rating"
+xtex = "Mean Week Minutes Active"
+
+(p3active = ggplot(data = df.rq2, aes(x = meanweekActiveminSum, y = womacstfxntot, color = session, shape = session)) +
+  geom_point() + 
+  geom_smooth(method = "lm", fill = NA) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 subtitle = "Scatter Plot",
+                 caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+
+ytex = "WOMAC Total Score"
+xtex = "Mean Week Minutes Active"
+(p4active = ggplot(data = df.rq2, aes(x = meanweekActiveminSum, y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+
+# grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+grid.arrange(p4steps, p4active)
+
+```
+
+
+
+```{r}
+# EQ5D5L
+require (psych)
+# describeBy(df.rq2, group = "session")
+
+# df.rq2$meanweeksteps
+# df.rq2$meanweekActiveminSum
+
+require(gridExtra)
+require(ggplot2)
+ytex = "EQ5D5L VAS"
+xtex = "Mean Week Steps"
+(p1steps = ggplot(data = df.rq2, aes(x = meanweeksteps, y = eq5d5l_vas, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 subtitle = "Scatter Plot",
+                 caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) )
+
+
+(p4active = ggplot(data = df.rq2, aes(x = meanweeksteps, y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+
+```
+
+```{r}
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+xtex = "Mean Week Minutes Active"
+(p1active = ggplot(data = df.rq2, aes(x = meanweekActiveminSum, y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste(xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+
+# grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+grid.arrange(p1steps, p1active)
+
+
+
+
+```
+
+
+
+## RQ2 Models
+```{r}
+## modeling / correlations
+require(corrr)
+require (dplyr)
+df.rq2.dataonly = df.rq2[,-c(1:2, 14)]
+df.rq2.dataonly %>% correlate() %>% focus(c(womacpaintot, womacstifftot, womacstfxntot, womactot))
+
+## Reshape to wide
+df.rq2.wide = reshape(df.rq2, idvar = "patientId", timevar = "session", direction = "wide")
+
+
+``` 
+
+
+``` {r}
+#Womac Total model VS mean week steps
+
+# aov doesn't work because of the covariate 
+# aov2 = aov(womactot ~ meanweeksteps * session + 
+#             Error(patientId/session), data =df.rq2)
+# summary(aov2)
+
+
+library(lme4)
+#lme is suggested for unbalanced designs like ours
+lmeModel = lmer(womactot ~ meanweeksteps*session + (1|patientId), data=df.rq2)
+anova(lmeModel, ddf="Kenward-Roger")
+#library(lmerTest)
+#summary(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+#spoke with stats prof and these are not the best way to test this. Updated tests are above.
+# df.rq2.wide$delta = df.rq2.wide$womactot.PostSx12 - df.rq2.wide$womactot.PreSx02
+# model = lm(delta ~ meanweeksteps.PostSx12 + meanweeksteps.PreSx02, data = df.rq2.wide) #can we use the pre and post to predict the change 
+# summary(model)
+# par(mfrow = c(2, 3))
+# plot(model, which = c(1:6))
+# 
+# ## Model fitting!
+# # Homoscedasticity:
+# # see also residual vs fitted plot
+# require(lmtest)
+# bptest(model) #the Breush-pagan test for homoscedasticity
+# # p>0.05 is homoscedasticity
+# 
+# #multicollinearity:
+# require(mctest)
+# X<-cbind(df.rq2.wide$meanweeksteps.PostSx12,df.rq2.wide$meanweeksteps.PreSx02) 
+# imcdiag(X, df.rq2.wide$delta, method="VIF")
+# 
+# #normality of residuals
+# # see also Normal QQ plot
+# shapiro.test(residuals(model)) #p>0.05 will be normal
+# 
+# #finding outliers and influential points
+# lev=hatvalues(model)
+# p = length(coef(model))
+# n = nrow(df.rq2.wide)
+# outlier = lev[lev>(2*p/n)] # can also use (3p/n) at tester's discretion
+# print("Outliers as found using Leverage Points")
+# print(outlier)
+# outlierrows = as.numeric(names(outlier))
+``` 
+
+
+``` {r}
+library(lme4)
+lmeModel = lmer(womactot ~ meanweekActiveminSum*session + (1|patientId), data=df.rq2)
+anova(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+
+
+#spoke with stats prof and these are not the best way to test this. Updated tests are above.
+# #WOMAC total Model Vs mean active minutes
+# df.rq2.wide$delta = (df.rq2.wide$womactot.PostSx12 - df.rq2.wide$womactot.PreSx02)
+# model = lm(delta ~ meanweekActiveminSum.PostSx12 + meanweekActiveminSum.PreSx02, data = df.rq2.wide) #can we use the pre and post to predict the change 
+# summary(model)
+# par(mfrow = c(2, 3))
+# plot(model, which = c(1:6))
+# 
+# 
+# ## Model fitting!
+# # Homoscedasticity:
+# # see also residual vs fitted plot
+# require(lmtest)
+# bptest(model) #the Breush-pagan test for homoscedasticity
+# # p>0.05 is homoscedasticity
+# 
+# #multicollinearity:
+# require(mctest)
+# X<-cbind(df.rq2.wide$meanweekActiveminSum.PostSx12,df.rq2.wide$meanweekActiveminSum.PreSx02) 
+# imcdiag(X, df.rq2.wide$delta, method="VIF")
+# 
+# #normality of residuals
+# # see also Normal QQ plot
+# shapiro.test(residuals(model)) #p>0.05 will be normal
+# 
+# #finding outliers and influential points
+# lev=hatvalues(model)
+# p = length(coef(model))
+# n = nrow(df.rq2.wide)
+# outlier = lev[lev>(2*p/n)] # can also use (3p/n) at tester's discretion
+# print("Outliers as found using Leverage Points")
+# print(outlier)
+# outlierrows = as.numeric(names(outlier))
+
+``` 
+
+
+``` {r}
+
+library(lme4)
+lmeModel = lmer(eq5d5l_vas ~ meanweeksteps*session + (1|patientId), data=df.rq2)
+anova(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+
+
+
+# # Eq vs mean week steps
+# df.rq2.wide$delta = df.rq2.wide$eq5d5l_vas.PostSx12 - df.rq2.wide$eq5d5l_vas.PreSx02
+# 
+# model = lm(delta ~ meanweeksteps.PostSx12 + meanweeksteps.PreSx02, data = df.rq2.wide) #can we use the pre and post to predict the change 
+# summary(model)
+# par(mfrow = c(2, 3))
+# plot(model, which = c(1:6))
+# 
+# ## Model fitting!
+# # Homoscedasticity:
+# # see also residual vs fitted plot
+# require(lmtest)
+# bptest(model) #the Breush-pagan test for homoscedasticity
+# # p>0.05 is homoscedasticity
+# 
+# #multicollinearity:
+# require(mctest)
+# X<-cbind(df.rq2.wide$meanweeksteps.PostSx12,df.rq2.wide$meanweeksteps.PreSx02) 
+# imcdiag(X, df.rq2.wide$delta, method="VIF")
+# 
+# #normality of residuals
+# # see also Normal QQ plot
+# shapiro.test(residuals(model)) #p>0.05 will be normal
+# 
+# #finding outliers and influential points
+# lev=hatvalues(model)
+# p = length(coef(model))
+# n = nrow(df.rq2.wide)
+# outlier = lev[lev>(2*p/n)] # can also use (3p/n) at tester's discretion
+# print("Outliers as found using Leverage Points")
+# print(outlier)
+# outlierrows = as.numeric(names(outlier))
+``` 
+
+
+``` {r}
+
+library(lme4)
+lmeModel = lmer(eq5d5l_vas ~ meanweekActiveminSum*session + (1|patientId), data=df.rq2)
+anova(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+# #Eq vs active minutes
+# df.rq2.wide$delta = df.rq2.wide$eq5d5l_vas.PostSx12 - df.rq2.wide$eq5d5l_vas.PreSx02
+# 
+# model = lm(delta ~ meanweekActiveminSum.PostSx12 + meanweekActiveminSum.PreSx02, data = df.rq2.wide) #can we use the pre and post to predict the change 
+# summary(model)
+# par(mfrow = c(2, 3))
+# plot(model, which = c(1:6))
+# 
+# ## Model fitting!
+# # Homoscedasticity:
+# # see also residual vs fitted plot
+# require(lmtest)
+# bptest(model) #the Breush-pagan test for homoscedasticity
+# # p>0.05 is homoscedasticity
+# 
+# #multicollinearity:
+# require(mctest)
+# X<-cbind(df.rq2.wide$meanweekActiveminSum.PostSx12,df.rq2.wide$meanweekActiveminSum.PreSx02) 
+# imcdiag(X, df.rq2.wide$delta, method="VIF")
+# 
+# #normality of residuals
+# # see also Normal QQ plot
+# shapiro.test(residuals(model)) #p>0.05 will be normal
+# 
+# #finding outliers and influential points
+# lev=hatvalues(model)
+# p = length(coef(model))
+# n = nrow(df.rq2.wide)
+# outlier = lev[lev>(2*p/n)] # can also use (3p/n) at tester's discretion
+# print("Outliers as found using Leverage Points")
+# print(outlier)
+# outlierrows = as.numeric(names(outlier))
+
+```
+
+    
+# Research Question 3: 
+
+Is a decrease in predicted risk for heart diseases, type 2 diabetes, arthritis, lung disease, low back pain, depression, and increased happiness associated with: 
+
+a)	improved patient reported outcomes (pain, joint stiffness, disability, and quality of life) at 6 weeks and 3 months post-TKA and 
+  •	Within group correlation on V scores (0-100, not categorized)
+  IV: V scores 
+  DV: reported outcomes
+  CoVar: Session
+
+b)	associated with patient satisfaction 6 weeks post-TKA?
+  •	Within group correlation on V scores (0-100, not categorized)
+  IV: V scores 
+  DV: reported outcomes
+  CoVar: Session
+
+
+```{r}
+## ggpairs for correlation matrix
+df.rq3 = df.viva.ready[,c(1, 2, 5:19, 31:36)]
+
+df.rq3$session = factor(df.rq3$session)
+df.rq3$vScore.Overall = as.numeric(as.character(df.rq3$vScore.Overall))
+df.rq3$Type.II.Diabetes.Score = as.numeric(as.character(df.rq3$Type.II.Diabetes.Score))
+df.rq3$Cardiovascular.Disease.Score = as.numeric(as.character(df.rq3$Cardiovascular.Disease.Score))
+df.rq3$Chornic.Low.Back.Pain.Score = as.numeric(as.character(df.rq3$Chornic.Low.Back.Pain.Score))
+df.rq3$Arthirtis.Score = as.numeric(as.character(df.rq3$Arthirtis.Score))
+df.rq3$Lung.Disease.Score = as.numeric(as.character(df.rq3$Lung.Disease.Score))
+df.rq3$Mind.Score = as.numeric(as.character(df.rq3$Mind.Score))
+df.rq3$Hapiness.Score = as.numeric(as.character(df.rq3$Hapiness.Score))
+df.rq3$Depression.Score = as.numeric(as.character(df.rq3$Depression.Score))
+df.rq3$Stress.Score = as.numeric(as.character(df.rq3$Stress.Score))
+df.rq3$vMove.Score = as.numeric(as.character(df.rq3$vMove.Score))
+df.rq3$vSleep.Score = as.numeric(as.character(df.rq3$vSleep.Score))
+df.rq3$Waist.Score = as.numeric(as.character(df.rq3$Waist.Score))
+df.rq3$Smoking.Score = as.numeric(as.character(df.rq3$Smoking.Score))
+df.rq3$Alcohol.Consumption.Score = as.numeric(as.character(df.rq3$Alcohol.Consumption.Score))
+
+
+
+
+
+
+require (psych)
+describeBy(df.rq3, group = "session")
+
+# df.rq3$meanweeksteps
+# df.rq3$meanweekActiveminSum
+
+require(gridExtra)
+require(ggplot2)
+
+q =  theme(axis.text.x = element_text(color="black", 
+                           size=10, angle=45),
+          axis.text.y = element_text(color="black", 
+                           size=10, angle=45))
+```
+
+
+``` {r}
+# Vscore overall Scatters========================
+#
+require (grid)
+require(gridExtra)
+require(ggpubr)
+ytex = "WOMAC Pain Rating"
+xtex = "VScore Overall"
+(p1pain = ggplot(data = df.rq3, aes(x = vScore.Overall, y = womacpaintot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+
+ytex = "WOMAC Stiffness Rating"
+(p2stiff = ggplot(data = df.rq3, aes(x = vScore.Overall, y = womacstifftot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Function Rating"
+(p3function = ggplot(data = df.rq3, aes(x = vScore.Overall, y = womacstfxntot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Total Rating"
+(p4totaloverall = ggplot(data = df.rq3, aes(x = vScore.Overall, y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ggarrange(p4totaloverall, p1pain, p2stiff, p3function, ncol = 2, nrow = 2, common.legend = TRUE)
+
+
+```
+
+
+``` {r}
+# Type II Diabetes Scatters==============================
+# 
+
+ytex = "WOMAC Pain Rating"
+xtex = "Type II Diabetes Score"
+(p1pain = ggplot(data = df.rq3, aes(x = Type.II.Diabetes.Score, y = womacpaintot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Stiffness Rating"
+(p2stiff = ggplot(data = df.rq3, aes(x = Type.II.Diabetes.Score, y = womacstifftot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+ytex = "WOMAC Function Rating"
+(p3function = ggplot(data = df.rq3, aes(x = Type.II.Diabetes.Score, y = womacstfxntot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+
+ytex = "WOMAC Total Rating"
+(p4total = ggplot(data = df.rq3, aes(x = Type.II.Diabetes.Score, y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+#grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+
+```
+
+
+``` {r}
+
+# Caridovascular Disease Score Scatters==============================
+# 
+
+ytex = "WOMAC Pain Rating"
+xtex = "Cardiovascular Score"
+(p1pain = ggplot(data = df.rq3, aes(x = Cardiovascular.Disease.Score, y = womacpaintot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+ytex = "WOMAC Stiffness Rating"
+(p2stiff = ggplot(data = df.rq3, aes(x = Cardiovascular.Disease.Score, y = womacstifftot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Function Rating"
+(p3function = ggplot(data = df.rq3, aes(x = Cardiovascular.Disease.Score, y = womacstfxntot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Total Rating"
+(p4total = ggplot(data = df.rq3, aes(x = Cardiovascular.Disease.Score, y = womactot, color = session, shape = session)) + 
+   geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+
+#grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+```
+
+
+``` {r}
+
+# Chronic Back Pain Score Scatters==============================
+# 
+
+ytex = "WOMAC Pain Rating"
+xtex = "Chronic Back Pain"
+(p1pain = ggplot(data = df.rq3, aes(x = Chornic.Low.Back.Pain.Score, y = womacpaintot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+ytex = "WOMAC Stiffness Rating"
+(p2stiff = ggplot(data = df.rq3, aes(x = Chornic.Low.Back.Pain.Score, y = womacstifftot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Function Rating"
+(p3function = ggplot(data = df.rq3, aes(x = Chornic.Low.Back.Pain.Score, y = womacstfxntot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Total Rating"
+(p4total = ggplot(data = df.rq3, aes(x = Chornic.Low.Back.Pain.Score, y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+#grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+```
+
+
+``` {r}
+# Arthirits Score Scatters============================== 
+
+ytex = "WOMAC Pain Rating"
+xtex = "Arthritis Scores"
+(p1pain = ggplot(data = df.rq3, aes(x = Arthirtis.Score, y = womacpaintot, color = session, shape = session)) + 
+geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Stiffness Rating"
+(p2stiff = ggplot(data = df.rq3, aes(x = Arthirtis.Score, y = womacstifftot, color = session, shape = session)) + 
+geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+ytex = "WOMAC Function Rating"
+(p3function = ggplot(data = df.rq3, aes(x = Arthirtis.Score, y = womacstfxntot, color = session, shape = session)) + 
+geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Total Rating"
+(p4total = ggplot(data = df.rq3, aes(x = Arthirtis.Score, y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+#grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+```
+
+
+``` {r}
+# Mind Score Scatters============================== 
+
+ytex = "WOMAC Pain Rating"
+xtex = "Mind Score"
+(p1pain = ggplot(data = df.rq3, aes(x = Mind.Score , y = womacpaintot, color = session, shape = session)) + 
+geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+```
+
+```{r}
+ytex = "WOMAC Stiffness Rating"
+(p2stiff = ggplot(data = df.rq3, aes(x = Mind.Score , y = womacstifftot, color = session, shape = session)) + 
+geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Function Rating"
+(p3function = ggplot(data = df.rq3, aes(x = Mind.Score , y = womacstfxntot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Total Rating"
+(p4total = ggplot(data = df.rq3, aes(x = Mind.Score , y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+#grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+
+```
+
+
+``` {r}
+
+# Happiness Score Scatters============================== 
+
+ytex = "WOMAC Pain Rating"
+xtex = "Happiness Score"
+(p1pain = ggplot(data = df.rq3, aes(x = Hapiness.Score  , y = womacpaintot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Stiffness Rating"
+(p2stiff = ggplot(data = df.rq3, aes(x = Hapiness.Score  , y = womacstifftot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Function Rating"
+(p3function = ggplot(data = df.rq3, aes(x = Hapiness.Score  , y = womacstfxntot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Total Rating"
+(p4total = ggplot(data = df.rq3, aes(x = Hapiness.Score  , y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+#grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+
+```
+
+
+``` {r}
+
+# Depression Score Scatters============================== 
+
+ytex = "WOMAC Pain Rating"
+xtex = "Depression Score"
+(p1pain = ggplot(data = df.rq3, aes(x = Depression.Score  , y = womacpaintot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Stiffness Rating"
+(p2stiff = ggplot(data = df.rq3, aes(x = Depression.Score  , y = womacstifftot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Function Rating"
+(p3function = ggplot(data = df.rq3, aes(x = Depression.Score  , y = womacstfxntot, color = session, shape = session)) +   geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+```
+
+```{r}
+ytex = "WOMAC Total Rating"
+(p4total = ggplot(data = df.rq3, aes(x = Depression.Score  , y = womactot, color = session, shape = session)) + 
+  geom_point(size = 2) + 
+  geom_smooth(method = "lm", fill = NA, size = 2) + 
+  labs(title = paste(xtex, " and ", ytex, sep = ""),
+                 #subtitle = "Scatter Plot",
+                 #caption = "12 weeks post surgery versus 2 weeks pre surgery",
+                 x = xtex, y = ytex) +
+    theme(text = element_text(size=fontsize, family = fonttype, face = "bold") ) +
+    ylim(0, 100) +
+    scale_colour_discrete(name  = "",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA")) +
+    scale_shape_discrete(name  ="",
+                            breaks=c("PreSx02", "PostSx12"),
+                            labels=c("Pre-TKA", "Post-TKA"))
+  )
+ggsave(paste("RQ3", xtex, " and ", ytex, ".png", sep = ""), dpi=figsize, height=fight, width=figwid, units=figunit)
+
+#grid.arrange(p1steps, p1active, p2steps, p2active, p3steps, p2active, p4steps, p4active, ncol = 2)
+
+```
+
+```{r}
+## modeling / correlations
+require(corrr)
+require (dplyr)
+df.rq3.dataonly = df.rq3[,-c(1:2, 19)]
+df.rq3.dataonly %>% correlate() %>% focus(c(womacpaintot, womacstifftot, womacstfxntot, womactot))
+
+## Reshape to wide
+df.rq3.wide = reshape(df.rq3, idvar = "patientId", timevar = "session", direction = "wide")
+
+##This works, but should check with Ania
+``` 
+
+## RQ3 Models
+``` {r}
+library(lme4)
+lmeModel = lmer(womactot ~ vScore.Overall*session + (1|patientId), data=df.rq3)
+anova(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+
+# #Womac vs vscore overall
+# df.rq3.wide$delta = df.rq3.wide$womactot.PostSx12 - df.rq3.wide$womactot.PreSx02
+# model = lm(delta ~ vScore.Overall.PostSx12 + vScore.Overall.PreSx02, data = df.rq3.wide) #can we use the pre and post to predict the change 
+# summary(model)
+# 
+# par(mfrow = c(2, 3))
+# plot(model, which = c(1:6))
+# 
+# ## Model fitting!
+# # Homoscedasticity:
+# # see also residual vs fitted plot
+# require(lmtest)
+# bptest(model) #the Breush-pagan test for homoscedasticity
+# # p>0.05 is homoscedasticity
+# 
+# #multicollinearity:
+# require(mctest)
+# X<-cbind(df.rq3.wide$vScore.Overall.PostSx12,df.rq3.wide$vScore.Overall.PreSx02) 
+# imcdiag(X, df.rq3.wide$delta, method="VIF")
+# 
+# #normality of residuals
+# # see also Normal QQ plot
+# shapiro.test(residuals(model)) #p>0.05 will be normal
+# 
+# #finding outliers and influential points
+# lev=hatvalues(model)
+# p = length(coef(model))
+# n = nrow(df.rq3.wide)
+# outlier = lev[lev>(2*p/n)] # can also use (3p/n) at tester's discretion
+# print("Outliers as found using Leverage Points")
+# print(outlier)
+# outlierrows = as.numeric(names(outlier))
+# 
+# # model = lm((womactot.PostSx12 - womactot.PreSx02) ~ vScore.Overall.PostSx12 + vScore.Overall.PreSx02 + (vScore.Overall.PostSx12 * vScore.Overall.PreSx02), data = df.rq3.wide) #can we use the pre and post to predict the change 
+
+```
+
+
+```{r}
+library(lme4)
+lmeModel = lmer(womacpaintot ~ vScore.Overall*session + (1|patientId), data=df.rq3)
+anova(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+
+# 
+# #EQ vs vscore overall
+# df.rq3.wide$delta = df.rq3.wide$eq5d5l_vas.PostSx12 - df.rq3.wide$eq5d5l_vas.PreSx02
+# model = lm(delta ~ vScore.Overall.PostSx12 + vScore.Overall.PreSx02, data = df.rq3.wide) #can we use the pre and post to predict the change 
+# summary(model)
+# par(mfrow = c(2, 3))
+# plot(model, which = c(1:6))
+# 
+# ## Model fitting!
+# # Homoscedasticity:
+# # see also residual vs fitted plot
+# require(lmtest)
+# bptest(model) #the Breush-pagan test for homoscedasticity
+# # p>0.05 is homoscedasticity
+# 
+# #multicollinearity:
+# require(mctest)
+# X<-cbind(df.rq3.wide$vScore.Overall.PostSx12,df.rq3.wide$vScore.Overall.PreSx02) 
+# imcdiag(X, df.rq3.wide$delta, method="VIF")
+# 
+# #normality of residuals
+# # see also Normal QQ plot
+# shapiro.test(residuals(model)) #p>0.05 will be normal
+# 
+# #finding outliers and influential points
+# lev=hatvalues(model)
+# p = length(coef(model))
+# n = nrow(df.rq3.wide)
+# outlier = lev[lev>(2*p/n)] # can also use (3p/n) at tester's discretion
+# print("Outliers as found using Leverage Points")
+# print(outlier)
+# outlierrows = as.numeric(names(outlier))
+# 
+# 
+# # model = lm((eq5d5l_vas.PostSx12 - eq5d5l_vas.PreSx02) ~ vScore.Overall.PostSx12 + vScore.Overall.PreSx02 + (vScore.Overall.PostSx12 * vScore.Overall.PreSx02), data = df.rq3.wide) #can we use the pre and post to predict the change 
+
+```
+
+
+```{r}
+library(lme4)
+lmeModel = lmer(womacstifftot ~ vScore.Overall*session + (1|patientId), data=df.rq3)
+anova(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+```
+
+
+
+```{r}
+library(lme4)
+lmeModel = lmer(womacstfxntot ~ vScore.Overall*session + (1|patientId), data=df.rq3)
+anova(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+```
+
+```{r}
+library(lme4)
+lmeModel = lmer(eq5d5l_vas ~ vScore.Overall*session + (1|patientId), data=df.rq3)
+anova(lmeModel)
+library(car)
+car::Anova(lmeModel)
+
+```
